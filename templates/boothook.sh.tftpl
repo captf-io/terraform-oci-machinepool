@@ -1,0 +1,8 @@
+#!/bin/sh
+# CAPTF OCI machinepool module boothook. cloud-init runs it early on every
+# boot, before the bootstrap data's own cloud-config
+# (https://cloudinit.readthedocs.io/en/latest/reference/user_data_formats.html).
+# It only writes files, so running it again is safe.
+set -eu
+
+${node_labels_script}
