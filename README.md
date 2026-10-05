@@ -12,7 +12,35 @@ autoscaling.
 
 Image: `ghcr.io/captf-io/oci-machinepool`. Contract:
 [machinepool role](https://captf.io/docs/module-author/contract/v1alpha1/machinepool.html).
-Design decisions: [DESIGN.md](DESIGN.md).
+Design decisions: [DESIGN.md](https://github.com/captf-io/terraform-oci-machinepool/blob/main/DESIGN.md).
+
+## Usage
+
+CAPTF runs this module from the module image `ghcr.io/captf-io/oci-machinepool`: set the image on
+a `TerraformMachinePool`'s `spec.source.image`, and the controller renders every
+input. The module is also published to the Terraform Registry as
+`captf-io/machinepool/oci` and can be called directly:
+
+```hcl
+module "machinepool" {
+  source  = "captf-io/machinepool/oci"
+  version = "~> 0.1"
+
+  # The contract inputs the controller would render (captf_contract,
+  # captf_cluster, captf_object, captf_tags, ...; see Inputs), and any
+  # user variables.
+}
+```
+
+Called directly, the module is a CAPTF root module first:
+
+- it configures its own `provider "oci"` block, so the calling
+  module cannot use `count`, `for_each` or `depends_on` on it, and the
+  provider takes its credentials from the environment (see Identity
+  Secret);
+- its providers are pinned to exact versions (`versions.tf`), which the
+  calling configuration has to accept;
+- you set the `captf_*` inputs yourself.
 
 ## What it creates
 
@@ -40,7 +68,7 @@ no SSH key, instance metadata v1 off, and the cluster's worker defined tag.
   autoscaler scales on its CPU metric.
 - **The kubelet's provider ID**: `provider-id: oci://{{ v1.instance_id }}`
   in the `KubeadmConfig`'s `kubeletExtraArgs`, as in
-  [`examples/cluster-kubeadm.yaml`](examples/cluster-kubeadm.yaml).
+  [`examples/cluster-kubeadm.yaml`](https://github.com/captf-io/terraform-oci-machinepool/blob/main/examples/cluster-kubeadm.yaml).
 - **Quotas** for the pool's instances, and room for twice the pool during a
   Kubernetes version roll.
 - **Permissions** of the identity's user:
@@ -189,7 +217,7 @@ not a member. A starting member never makes the pool `pending`.
 ## Exceptions
 
 - `tfcapi-lint` (module and image) warns `pool/autoscaling-ignore-changes`,
-  allowed in the [Makefile](Makefile) (`TFCAPI_LINT_ALLOW`):
+  allowed in the [Makefile](https://github.com/captf-io/terraform-oci-machinepool/blob/main/Makefile) (`TFCAPI_LINT_ALLOW`):
   the check knows desired-count attributes by name, and an OCI pool's is
   `size`, which it does not list. The autoscaled pool does ignore `size`;
   the unit test `autoscaling_keeps_observed_size` proves it.
@@ -203,7 +231,7 @@ not a member. A starting member never makes the pool `pending`.
 
 ## Examples
 
-[`examples/cluster-kubeadm.yaml`](examples/cluster-kubeadm.yaml): a MachinePool of
+[`examples/cluster-kubeadm.yaml`](https://github.com/captf-io/terraform-oci-machinepool/blob/main/examples/cluster-kubeadm.yaml): a MachinePool of
 three workers with a label, and the autoscaled variant through the
 MachinePool's annotations:
 
