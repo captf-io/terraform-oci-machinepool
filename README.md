@@ -156,7 +156,7 @@ The machinepool role exports nothing; it reads the cluster's `exports`
 ## Identity Secret
 
 The cluster's identity, unless the `TerraformMachinePool` sets its own
-`identityRef`. See the [archived oci-modules README](https://github.com/captf-io/oci-modules#using-it).
+`identityRef`. See the [OCI cloud modules docs](https://captf.io/docs/cloud-modules/oci/).
 
 ## Lifecycle
 
