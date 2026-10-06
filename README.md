@@ -36,13 +36,13 @@ of the module contract. It creates one instance pool per
 over the MachinePool's failure domains, at a fixed size or sized by OCI
 autoscaling.
 
-The module image is `ghcr.io/captf-io/oci-machinepool`, published from
-[oci-modules](https://github.com/captf-io/oci-modules). Design decisions are
+The module image is `ghcr.io/captf-io/module-images/oci-machinepool`, built and published by
+[module-images](https://github.com/captf-io/module-images) from this repository's releases. Design decisions are
 in [DESIGN.md](https://github.com/captf-io/terraform-oci-machinepool/blob/main/DESIGN.md).
 
 ## Using it
 
-CAPTF runs this module from the module image `ghcr.io/captf-io/oci-machinepool`:
+CAPTF runs this module from the module image `ghcr.io/captf-io/module-images/oci-machinepool`:
 set the image on a `TerraformMachinePool`'s `spec.source.image`, and the
 controller renders every input. The module is also published to the Terraform
 Registry as `captf-io/machinepool/oci` and can be called directly:
@@ -156,7 +156,7 @@ The machinepool role exports nothing; it reads the cluster's `exports`
 ## Identity Secret
 
 The cluster's identity, unless the `TerraformMachinePool` sets its own
-`identityRef`. See the [oci-modules README](https://github.com/captf-io/oci-modules#using-it).
+`identityRef`. See the [archived oci-modules README](https://github.com/captf-io/oci-modules#using-it).
 
 ## Lifecycle
 
@@ -295,8 +295,8 @@ the gate. Override variables on the command line, for example
 
 `tfcapi-lint` is built from the provider repository, found through
 `PROVIDER_DIR` (default `../cluster-api-provider-terraform`). The repository
-holds the code only: the module images are built and published from
-[oci-modules](https://github.com/captf-io/oci-modules).
+holds the code only: the module images are built and published by
+[module-images](https://github.com/captf-io/module-images) from this repository's releases.
 
 <br>
 <p align="center">
