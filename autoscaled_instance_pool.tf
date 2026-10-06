@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# The pool when autoscaling is on: created at replicas, then sized by
-# pool_autoscaling_configuration.tf, so an apply never resets what the
-# autoscaler decided (machinepool.md "autoscaling (input)"). See
+# The pool when autoscaling is on: created at replicas, then sized by a
+# scaler, so an apply never resets what it decided (machinepool.md
+# "autoscaling (input)"): the OCI autoscaling configuration of
+# pool_autoscaling_configuration.tf with autoscaler = "native", or one outside
+# the module with "external". The pool is the same either way. See
 # fixed_instance_pool.tf for why there are two pool resources.
 resource "oci_core_instance_pool" "autoscaled_instance_pool" {
   count = var.autoscaling.enabled ? 1 : 0
@@ -39,7 +41,7 @@ resource "oci_core_instance_pool" "autoscaled_instance_pool" {
     }
   }
 
-  # size is the desired count the autoscaler owns. A Kubernetes version
+  # size is the desired count the scaler owns, native or external. A Kubernetes version
   # change replaces the pool, as for the fixed pool.
   lifecycle {
     create_before_destroy = true

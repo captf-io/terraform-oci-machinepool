@@ -142,6 +142,16 @@ run "invalid_additional_tags_reserved" {
   expect_failures = [var.additional_tags]
 }
 
+run "invalid_autoscaler" {
+  command = plan
+
+  variables {
+    autoscaler = "cluster-autoscaler"
+  }
+
+  expect_failures = [var.autoscaler]
+}
+
 run "invalid_autoscaling_cool_down_seconds" {
   command = plan
 

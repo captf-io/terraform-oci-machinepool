@@ -116,7 +116,7 @@ variable "node_labels" {
 }
 
 variable "autoscaling" {
-  description = "Parsed from the MachinePool's autoscaler annotations. enabled hands the size to an OCI autoscaling configuration with these bounds."
+  description = "Parsed from the MachinePool's autoscaler annotations. enabled hands the size to a scaler within these bounds: this module's OCI autoscaling configuration, or one outside it, as the autoscaler variable says."
   type = object({
     enabled = bool
     min     = number

@@ -13,13 +13,15 @@
 # limitations under the License.
 
 # Native autoscaling of the pool on CPU utilization, within the MachinePool's
-# autoscaler annotations (machinepool.md "autoscaling (input)"). The metrics
-# come from the Compute Instance Monitoring plugin of the Oracle Cloud Agent,
-# which the image must run. Every policy field forces a new configuration,
-# so new bounds replace it; a pool holds one configuration at a time, hence
-# no create_before_destroy.
+# autoscaler annotations (machinepool.md "autoscaling (input)"). Only with
+# autoscaler = "native": with "external" no configuration exists, so a scaler
+# outside the module owns the size and the preconditions below do not apply.
+# The metrics come from the Compute Instance Monitoring plugin of the Oracle
+# Cloud Agent, which the image must run. Every policy field forces a new
+# configuration, so new bounds replace it; a pool holds one configuration at
+# a time, hence no create_before_destroy.
 resource "oci_autoscaling_auto_scaling_configuration" "pool_autoscaling_configuration" {
-  count = var.autoscaling.enabled ? 1 : 0
+  count = var.autoscaling.enabled && var.autoscaler == "native" ? 1 : 0
 
   compartment_id       = local.compartment_id
   cool_down_in_seconds = var.autoscaling_cool_down_seconds

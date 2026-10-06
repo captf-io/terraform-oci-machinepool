@@ -31,7 +31,7 @@ variable "additional_nsg_ids" {
 }
 
 variable "additional_tags" {
-  description = "Extra OCI free-form tags for the pool, its instance configurations, instances and VNICs, and the autoscaling configuration. At most 4: OCI allows 10 free-form tags per resource and captf_tags takes 6."
+  description = "Extra OCI free-form tags for the pool, its instance configurations, instances and VNICs, and the autoscaling configuration when there is one. At most 4: OCI allows 10 free-form tags per resource and captf_tags takes 6."
   type        = map(string)
   default     = {}
   nullable    = false
@@ -57,8 +57,20 @@ variable "autoscaled" {
   nullable    = false
 }
 
+variable "autoscaler" {
+  description = "What sets the instance pool's size while autoscaling is enabled: native, this module's OCI autoscaling configuration, or external, no autoscaling configuration, so a scaler outside the module (such as the Kubernetes Cluster Autoscaler's oci cloud provider) sets it within autoscaling.min and max. Native is the default so an autoscaled pool scales without anything else installed."
+  type        = string
+  default     = "native"
+  nullable    = false
+
+  validation {
+    condition     = contains(["native", "external"], var.autoscaler)
+    error_message = "autoscaler must be native or external."
+  }
+}
+
 variable "autoscaling_cool_down_seconds" {
-  description = "With autoscaling, the minimum time between two scaling actions. 300 by default, OCI's minimum: time for a new node to join and take load."
+  description = "With the native autoscaler, the minimum time between two scaling actions (ignored when autoscaler is external). 300 by default, OCI's minimum: time for a new node to join and take load."
   type        = number
   default     = 300
   nullable    = false
@@ -70,7 +82,7 @@ variable "autoscaling_cool_down_seconds" {
 }
 
 variable "autoscaling_scale_in_cpu_percent" {
-  description = "With autoscaling, remove an instance when the pool's CPU utilization stays below this percentage. 30 by default: well apart from the scale-out threshold, so the pool does not flap."
+  description = "With the native autoscaler, remove an instance when the pool's CPU utilization stays below this percentage (ignored when autoscaler is external). 30 by default: well apart from the scale-out threshold, so the pool does not flap."
   type        = number
   default     = 30
   nullable    = false
@@ -82,7 +94,7 @@ variable "autoscaling_scale_in_cpu_percent" {
 }
 
 variable "autoscaling_scale_out_cpu_percent" {
-  description = "With autoscaling, add an instance when the pool's CPU utilization stays above this percentage. 70 by default."
+  description = "With the native autoscaler, add an instance when the pool's CPU utilization stays above this percentage (ignored when autoscaler is external). 70 by default."
   type        = number
   default     = 70
   nullable    = false

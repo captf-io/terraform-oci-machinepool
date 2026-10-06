@@ -86,6 +86,17 @@ Concerns the machine role: see [terraform-oci-machine DESIGN.md](https://github.
   but it does not order a destroy and a create at two different addresses,
   so a mode switch still removes the old pool's instances at once; the
   guard makes that a choice.
+- External autoscaler: `autoscaler = "external"` keeps autoscaling mode (the
+  autoscaled pool, `ignore_changes = [size]`) but creates no autoscaling
+  configuration. The Kubernetes Cluster Autoscaler's `oci` provider resizes
+  instance pools itself and picks and drains its scale-in victims; a
+  configuration scaling on CPU beside it would fight it, removing nodes it
+  added without a drain. Only the configuration's count changes: the pool
+  resources do not reference it, so switching `autoscaler` neither replaces
+  nor resizes the pool. The minimum of 1 and the threshold check come from
+  the OCI autoscaling configuration (Unverified 4), so they apply to the
+  native autoscaler only. `native` stays the default so an autoscaled pool
+  scales with nothing else installed.
 - Rejected: one pool with `ignore_changes = [size]` and an always-present
   autoscaling configuration pinned to `min = max = replicas` when autoscaling
   is off. Every policy field is ForceNew, so each `replicas` change would
@@ -215,6 +226,15 @@ plan).
 images such as image-builder's.
 
 **10.** Concerns the cluster role: see [terraform-oci-cluster DESIGN.md](https://github.com/captf-io/terraform-oci-cluster/blob/main/DESIGN.md#unverified).
+
+**11.** Whether deleting an autoscaling configuration (switching `autoscaler`
+from native to external) leaves the pool's size unchanged.
+
+**12.** Whether an instance pool accepts size 0, for when the Cluster
+Autoscaler scales an external pool to 0.
+
+**13.** The Cluster Autoscaler's `oci` provider driving a CAPTF pool has not
+been run against a live cluster.
 
 ## Rejected alternatives
 

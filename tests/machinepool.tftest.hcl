@@ -370,6 +370,43 @@ run "autoscaling_keeps_observed_size" {
   }
 }
 
+run "autoscaling_external" {
+  variables {
+    autoscaling = { enabled = true, min = 2, max = 6 }
+    autoscaled  = true
+    autoscaler  = "external"
+    replicas    = 5
+  }
+
+  assert {
+    condition     = length(oci_autoscaling_auto_scaling_configuration.pool_autoscaling_configuration) == 0
+    error_message = "With autoscaler external no autoscaling configuration exists: a scaler outside the module owns the size."
+  }
+  assert {
+    condition     = length(oci_core_instance_pool.autoscaled_instance_pool) == 1 && length(oci_core_instance_pool.fixed_instance_pool) == 0
+    error_message = "The pool is the autoscaled one whatever the autoscaler, so switching it does not replace the pool."
+  }
+  assert {
+    condition     = oci_core_instance_pool.autoscaled_instance_pool[0].size == 4 && output.provider_id == oci_core_instance_pool.autoscaled_instance_pool[0].id
+    error_message = "An external autoscaler's size is kept: the pool is not resized or replaced."
+  }
+}
+
+run "autoscaling_external_min_zero" {
+  command = plan
+
+  variables {
+    autoscaling = { enabled = true, min = 0, max = 5 }
+    autoscaled  = true
+    autoscaler  = "external"
+  }
+
+  assert {
+    condition     = length(oci_autoscaling_auto_scaling_configuration.pool_autoscaling_configuration) == 0
+    error_message = "min 0 must be accepted with autoscaler external: the minimum of 1 comes from OCI's autoscaling configuration."
+  }
+}
+
 run "node_labels_rendered" {
   variables {
     node_labels = {

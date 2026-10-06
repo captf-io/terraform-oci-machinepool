@@ -33,8 +33,8 @@ module behind `TerraformMachinePool`, implementing the
 [machinepool role](https://captf.io/docs/module-author/contract/v1alpha1/machinepool.html)
 of the module contract. It creates one instance pool per
 `TerraformMachinePool`, launched from an instance configuration and spread
-over the MachinePool's failure domains, at a fixed size or sized by OCI
-autoscaling.
+over the MachinePool's failure domains, at a fixed size, sized by OCI
+autoscaling, or sized by a scaler outside the module.
 
 The module image is `ghcr.io/captf-io/module-images/oci-machinepool`, built and published by
 [module-images](https://github.com/captf-io/module-images) from this repository's releases. Design decisions are
@@ -74,8 +74,8 @@ Called directly, the module is a CAPTF root module first:
 | --- | --- | --- |
 | Instance configuration the pool launches from | `oci_core_instance_configuration.pool_instance_configuration` | always |
 | Instance pool at `replicas` | `oci_core_instance_pool.fixed_instance_pool` | `autoscaling.enabled` false |
-| Instance pool whose size the autoscaler owns | `oci_core_instance_pool.autoscaled_instance_pool` | `autoscaling.enabled` |
-| Autoscaling configuration (CPU thresholds) | `oci_autoscaling_auto_scaling_configuration.pool_autoscaling_configuration` | `autoscaling.enabled` |
+| Instance pool whose size a scaler owns | `oci_core_instance_pool.autoscaled_instance_pool` | `autoscaling.enabled` |
+| Autoscaling configuration (CPU thresholds) | `oci_autoscaling_auto_scaling_configuration.pool_autoscaling_configuration` | `autoscaling.enabled` and `autoscaler` `native` |
 | Roll trigger on `kubernetes_version` | `terraform_data.kubernetes_version_roll` | always |
 
 It reads the pool's members on every refresh.
@@ -89,9 +89,9 @@ no SSH key, instance metadata v1 off, and the cluster's worker defined tag.
 
 - A cluster made by the OCI cluster module, or `external_cluster_exports`.
 - **An image** as for the machine role ([terraform-oci-machine README](https://github.com/captf-io/terraform-oci-machine/blob/main/README.md#prerequisites)),
-  with cloud-init (node labels need it). With autoscaling, the image must run
-  the Oracle Cloud Agent's Compute Instance Monitoring plugin: the
-  autoscaler scales on its CPU metric.
+  with cloud-init (node labels need it). With the native autoscaler, the image
+  must run the Oracle Cloud Agent's Compute Instance Monitoring plugin: it
+  scales on its CPU metric. The external autoscaler needs no plugin.
 - **The kubelet's provider ID**: `provider-id: oci://{{ v1.instance_id }}`
   in the `KubeadmConfig`'s `kubeletExtraArgs`, as in
   [`examples/cluster-kubeadm.yaml`](https://github.com/captf-io/terraform-oci-machinepool/blob/main/examples/cluster-kubeadm.yaml).
@@ -129,9 +129,10 @@ to the worker subnet and `preemptible` has no control-plane check, plus:
 | `autoscaling_scale_in_cpu_percent` | `number` | `30` | Remove an instance below this CPU utilization. |
 | `autoscaling_cool_down_seconds` | `number` | `300` | Minimum time between scaling actions (OCI's minimum). |
 | `autoscaled` | `bool` | `false` | Must equal `autoscaling.enabled`: the deliberate second switch for a mode change, which replaces the pool. |
+| `autoscaler` | `string` | `"native"` | With autoscaling enabled, what sets the size: `native` (this module's autoscaling configuration) or `external` (no configuration; a scaler outside the module, such as the Kubernetes Cluster Autoscaler, sets it within `autoscaling.min` and `max`). The three CPU and cool-down variables above apply to `native` only. No effect while autoscaling is off. |
 
 The full list: `additional_nsg_ids`, `additional_tags`, `autoscaled`,
-`autoscaling_cool_down_seconds`, `autoscaling_scale_in_cpu_percent`,
+`autoscaler`, `autoscaling_cool_down_seconds`, `autoscaling_scale_in_cpu_percent`,
 `autoscaling_scale_out_cpu_percent`, `boot_volume_kms_key_id`,
 `boot_volume_size_gib`, `external_cluster_exports`, `ignore_defined_tags`,
 `image_id` (required), `memory_gib`, `ocpus`, `preemptible`, `public_ip`,
@@ -167,8 +168,9 @@ What updates in place and what rolls (machinepool.md "Lifecycle"):
 | `bootstrap_data` (a token rotation, about every 7.5 minutes with kubeadm), `node_labels`, image or any instance setting | A new instance configuration, created before the old one is deleted; the pool switches to it in place. Running instances stay; new ones get the new settings. |
 | `kubernetes_version`, compared verbatim (a `+rke2rN` bump included) | The pool is replaced, new before old: a new pool comes up at the current size, then the old one and its instances go, and leave `provider_id_list`. `provider_id` changes. |
 | `replicas`, autoscaling off | The pool is resized in place. |
-| `replicas`, autoscaling on | Nothing: the autoscaler owns the size (`ignore_changes = [size]`). |
-| `autoscaling.min`/`max` | The autoscaling configuration is replaced; the pool stays. |
+| `replicas`, autoscaling on | Nothing: the scaler owns the size (`ignore_changes = [size]`). |
+| `autoscaling.min`/`max` | With the native autoscaler, the autoscaling configuration is replaced; the pool stays. With the external one, nothing changes in OCI. |
+| `autoscaler`, autoscaling on | The autoscaling configuration is created (`native`) or deleted (`external`); the pool and its size stay. |
 | `autoscaling.enabled` on or off | Refused until `autoscaled` matches it; then the pool is replaced (it is a different resource), every instance at once. |
 | `failure_domains` | The pool's placement is updated in place; existing instances stay where they are. |
 
@@ -203,7 +205,7 @@ it fails a precondition.
 ## Tags
 
 The pool, the instance configuration, the instances and their VNICs (through
-the instance configuration) and the autoscaling configuration carry
+the instance configuration) and the autoscaling configuration (native autoscaler only) carry
 `captf_tags` as free-form tags, `.` and space mapped to `_`
 (`captf_io/cluster`), plus at most four `additional_tags`. Instances also
 carry the cluster's worker defined tag, when it has one.
@@ -233,8 +235,11 @@ not a member. A starting member never makes the pool `pending`.
   OCI's pre-termination lifecycle action only delays termination; draining
   would still need an in-cluster handler, so it is not configured.
 - **No addresses** in `instances`: the pool's member list carries none.
-- **Autoscaling at zero** is rejected (`min` must be at least 1) until OCI
-  threshold autoscaling down to zero is verified.
+- **Native autoscaling at zero** is rejected (`min` must be at least 1)
+  until OCI threshold autoscaling down to zero is verified. With
+  `autoscaler = "external"` there is no autoscaling configuration and `min`
+  0 is accepted, but whether an instance pool takes size 0 is unverified
+  (DESIGN.md "Unverified").
 - **Existing members keep** their labels and bootstrap settings; only new
   members get a new instance configuration.
 - **Bootstrap data size and secrecy** as for the machine role; the boothook
@@ -269,6 +274,20 @@ metadata:
 ```
 
 with `autoscaled: true` in the `TerraformMachinePool`'s `spec.variables`.
+
+### With the Kubernetes Cluster Autoscaler
+
+To size the pool with the Cluster Autoscaler's `oci` cloud provider
+(instance pools) instead of OCI autoscaling, set the same annotations and
+`autoscaled: true`, and add `autoscaler: external` to `spec.variables`. The
+module then creates the pool but no autoscaling configuration, so nothing
+else scales the pool or removes nodes the Cluster Autoscaler added. Point the
+Cluster Autoscaler's `oci` provider at the pool's OCID, the `provider_id`
+output. A Kubernetes version change replaces the pool and changes that OCID
+(see Lifecycle), so the Cluster Autoscaler's node-group configuration must
+follow it. The module sets the size only at creation; the `replicas` output
+reports what OCI holds, and the controller writes it back to the MachinePool.
+This setup has not been run against a live cluster (DESIGN.md "Unverified").
 
 ## Developing
 
